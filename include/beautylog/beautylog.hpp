@@ -44,7 +44,7 @@ namespace beautylog
 
 			if (no_defer)
 			{
-				send_structured_message(this_entry, false);
+				send_structured_message(this_entry);
 			}
 			else
 			{
@@ -71,12 +71,12 @@ namespace beautylog
 			std::vector<std::string> vector_string;
 
 			vector_string.push_back("PRIORITY=" + std::to_string(this_entry.priority));
-			for (const auto& f : e.log_fields)
+			for (const auto& f : this_entry.log_fields)
 			{
 				vector_string.push_back(f.first + "=" + f.second);
 			}
 
-			vector_string.push_back("MESSAGE=" + e.log_message);
+			vector_string.push_back("MESSAGE=" + this_entry.log_message);
 
 			send_send_structured_message_lines(vector_string);
 		}
