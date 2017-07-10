@@ -13,6 +13,9 @@
 
 namespace beautylog
 {
+	typedef void(*send_structured_message_lines_fn_t)(const std::vector<std::string>& vector_field_string, const std::string message);
+	extern send_structured_message_lines_fn_t send_structured_message_lines_impl;
+
 	struct log_entry
 	{
 		int priority = 0;
@@ -27,12 +30,14 @@ namespace beautylog
 		sd_loger();
 		~sd_loger();
 
+		static std::string cpp_file_pretty(const char* file);
+
 		template<typename... Args>
 		void log_with_location(int priority, const char* file, int sourceline, const char* func, const std::string& fmt, Args&&... args)
 		{
 			log_entry this_entry;
 
-			this_entry.log_fields["CODE_FILE"] = file;
+			this_entry.log_fields["CODE_FILE"] = cpp_file_pretty(file);
 			this_entry.log_fields["CODE_FUNC"] = func;
 			this_entry.log_fields["CODE_LINE"] = std::to_string(sourceline);
 
@@ -53,37 +58,7 @@ namespace beautylog
 			}
 		}
 
-		template<typename... Args>
-		static void log_with_location_but_no_constant_field(int priority, const char* file, int sourceline, const char* func, const std::string& fmt, Args&&... args)
-		{
-			log_entry this_entry;
-
-			this_entry.log_fields["CODE_FILE"] = file;
-			this_entry.log_fields["CODE_FUNC"] = func;
-			this_entry.log_fields["CODE_LINE"] = std::to_string(sourceline);
-
-			this_entry.msg_time = boost::posix_time::microsec_clock::local_time();
-
-			this_entry.priority = priority;
-
-			this_entry.log_message = format_msg(fmt, std::forward<Args>(args)...);
-
-			std::vector<std::string> vector_string;
-
-			vector_string.push_back("PRIORITY=" + std::to_string(this_entry.priority));
-			for (const auto& f : this_entry.log_fields)
-			{
-				vector_string.push_back(f.first + "=" + f.second);
-			}
-
-			vector_string.push_back("MESSAGE=" + this_entry.log_message);
-
-			send_send_structured_message_lines(vector_string);
-		}
-
 		void send_structured_message(const log_entry&e) const;
-
-		static void send_send_structured_message_lines(const std::vector<std::string>& msg_lines);
 
 	public:
 		void flush();
@@ -102,6 +77,32 @@ namespace beautylog
 		bool no_defer = false;
 		mutable std::mutex m_mutex;
 	};
+
+	template<typename... Args>
+	void log_with_location_but_no_constant_field(int priority, const char* file, int sourceline, const char* func, const std::string& fmt, Args&&... args)
+	{
+		log_entry this_entry;
+
+		this_entry.log_fields["CODE_FILE"] = sd_loger::cpp_file_pretty(file);
+		this_entry.log_fields["CODE_FUNC"] = func;
+		this_entry.log_fields["CODE_LINE"] = std::to_string(sourceline);
+
+		this_entry.msg_time = boost::posix_time::microsec_clock::local_time();
+
+		this_entry.priority = priority;
+
+		this_entry.log_message = format_msg(fmt, std::forward<Args>(args)...);
+
+		std::vector<std::string> vector_string;
+
+		vector_string.push_back("PRIORITY=" + std::to_string(this_entry.priority));
+		for (const auto& f : this_entry.log_fields)
+		{
+			vector_string.push_back(f.first + "=" + f.second);
+		}
+
+		send_structured_message_lines_impl(vector_string, this_entry.log_message);
+	}
 } // namespace beautylog
 
 #ifdef _MSC_VER
